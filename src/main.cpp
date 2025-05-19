@@ -4,6 +4,7 @@
 #include <secrets.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <freertos/semphr.h>
 /*
 Create secretes.h with the following structure:
 
@@ -27,24 +28,51 @@ const int oneWireBus = 4;
 OneWire oneWire(oneWireBus);
 DallasTemperature sensors(&oneWire); // Pass our oneWire reference to Dallas Temperature sensor 
 
+// Semaphore
+SemaphoreHandle_t firebaseMutex;
+
 
 
 void TaskTemperature(void *pvParameters){
-    while (true){               
-      sensors.requestTemperatures(); 
-      float temperatureC = sensors.getTempCByIndex(0);
-
-      if (Firebase.setFloat(fbdo, "/temperature", temperatureC)){
-        Serial.println("Success on sending data temp");
-      } else {
-        Serial.println("Fail on sending data tempo");
-      }
-
-      Serial.print(temperatureC);
-      Serial.println("ºC");
-      
+    while (true){           
+      if (xSemaphoreTake(firebaseMutex, portMAX_DELAY)) {
+        sensors.requestTemperatures(); 
+        float temperatureC = sensors.getTempCByIndex(0);
+        
+        if (Firebase.setFloat(fbdo, "/temperature", temperatureC)){
+          Serial.println("Success on sending data temp");
+        } else {
+          Serial.println("Fail on sending data temp");
+        }
+        
+        Serial.print(temperatureC);
+        Serial.println("ºC");
+        
+        xSemaphoreGive(firebaseMutex);
+      }    
       vTaskDelay(100 / portTICK_PERIOD_MS);
     }
+}
+
+void TaskReceiveTemperature(void *pvParameters){
+  while (true){
+    if (xSemaphoreTake(firebaseMutex, portMAX_DELAY)) {
+
+      if (Firebase.getFloat(fbdo, "/setTemperature")) {
+        float setTemp = fbdo.to<float>();
+        Serial.print("Valor lido de /setTemperature: ");
+        Serial.println(setTemp);
+        // Adicionar lógica do led RGD
+      } else {
+        Serial.print("Erro ao ler /setTemperature: ");
+        Serial.println(fbdo.errorReason());
+      }
+
+      xSemaphoreGive(firebaseMutex);
+      
+    }
+    vTaskDelay(500 / portTICK_PERIOD_MS); // aguarda 500ms antes de ler de novo
+  }
 }
 
 
@@ -85,6 +113,9 @@ void setup()
   /* Initialize Temperature sensor */
   sensors.begin();
 
+  /* Initializ Samaphore */
+  firebaseMutex = xSemaphoreCreateMutex();
+
   xTaskCreatePinnedToCore(
       TaskTemperature,
       "TaskTemperature",
@@ -94,9 +125,16 @@ void setup()
       NULL,
       1
   );
+
+  xTaskCreatePinnedToCore(
+      TaskReceiveTemperature,
+      "TaskReceiveTemperature",
+      8192,
+      NULL,
+      1,
+      NULL,
+      1
+  );
 }
 
-void loop()
-{
-
-}
+void loop() {}
