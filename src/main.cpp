@@ -82,6 +82,9 @@ void setup()
   /* Initialize the library with the Firebase authen and config */
   Firebase.begin(&config, &auth);
 
+  /* Initialize Temperature sensor */
+  sensors.begin();
+
   xTaskCreatePinnedToCore(
       TaskTemperature,
       "TaskTemperature",
