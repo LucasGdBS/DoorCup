@@ -18,6 +18,11 @@ Create secretes.h with the following structure:
 // Provide the RTDB payload printing info and other helper functions.
 #include <addons/RTDBHelper.h>
 
+// LED RGB PINS
+#define LED_RED_PIN    21
+#define LED_GREEN_PIN  22
+#define LED_BLUE_PIN   23
+
 /* FireBase Config vars */
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -31,7 +36,11 @@ DallasTemperature sensors(&oneWire); // Pass our oneWire reference to Dallas Tem
 // Semaphore
 SemaphoreHandle_t firebaseMutex;
 
-
+void setColorRGB(bool r, bool g, bool b) {
+  digitalWrite(LED_RED_PIN, r);
+  digitalWrite(LED_GREEN_PIN, g);
+  digitalWrite(LED_BLUE_PIN, b);
+}
 
 void TaskTemperature(void *pvParameters){
     while (true){           
@@ -62,7 +71,18 @@ void TaskReceiveTemperature(void *pvParameters){
         float setTemp = fbdo.to<float>();
         Serial.print("Valor lido de /setTemperature: ");
         Serial.println(setTemp);
-        // Adicionar lógica do led RGD
+
+        // RGB LED color control
+        if (setTemp >= 0 && setTemp < 12.5) {
+          // Blue
+          setColorRGB(LOW, LOW, HIGH);
+        } else if (setTemp >= 12.5 && setTemp < 37.5) {
+          // Pink (Red + Blue)
+          setColorRGB(HIGH, LOW, HIGH);
+        } else {
+          // Red
+          setColorRGB(HIGH, LOW, LOW);
+        }
       } else {
         Serial.print("Erro ao ler /setTemperature: ");
         Serial.println(fbdo.errorReason());
@@ -113,8 +133,15 @@ void setup()
   /* Initialize Temperature sensor */
   sensors.begin();
 
-  /* Initializ Samaphore */
+  /* Initialize Samaphore */
   firebaseMutex = xSemaphoreCreateMutex();
+
+  /* Initialialize RGB Led*/
+  pinMode(LED_RED_PIN, OUTPUT);
+  pinMode(LED_GREEN_PIN, OUTPUT);
+  pinMode(LED_BLUE_PIN, OUTPUT);
+  setColorRGB(LOW, HIGH, LOW); // Set green light on initialize
+
 
   xTaskCreatePinnedToCore(
       TaskTemperature,
