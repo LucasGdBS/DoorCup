@@ -33,6 +33,8 @@ const int oneWireBus = 4;
 OneWire oneWire(oneWireBus);
 DallasTemperature sensors(&oneWire); // Pass our oneWire reference to Dallas Temperature sensor 
 
+float lastTemperatureRead = 0.0;
+
 // Semaphore
 SemaphoreHandle_t firebaseMutex;
 
@@ -47,6 +49,7 @@ void TaskTemperature(void *pvParameters){
       if (xSemaphoreTake(firebaseMutex, portMAX_DELAY)) {
         sensors.requestTemperatures(); 
         float temperatureC = sensors.getTempCByIndex(0);
+        lastTemperatureRead = temperatureC;
         
         if (Firebase.setFloat(fbdo, "/temperature", temperatureC)){
           Serial.println("Success on sending data temp");
@@ -71,6 +74,16 @@ void TaskReceiveTemperature(void *pvParameters){
         float setTemp = fbdo.to<float>();
         Serial.print("Valor lido de /setTemperature: ");
         Serial.println(setTemp);
+
+        if (abs(lastTemperatureRead - setTemp) < 0.1) {
+          Serial.println("Temperatura igual! Piscando Led verde...");
+          for (int i=0; i<0; i++){
+            setColorRGB(LOW, HIGH, LOW); // Green
+            vTaskDelay(pdMS_TO_TICKS(100));
+            setColorRGB(LOW, LOW, LOW);  // OFF
+            vTaskDelay(pdMS_TO_TICKS(100));
+          }
+        }
 
         // RGB LED color control
         if (setTemp >= 0 && setTemp < 12.5) {
