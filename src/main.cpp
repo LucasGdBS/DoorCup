@@ -75,9 +75,9 @@ void TaskReceiveTemperature(void *pvParameters){
         Serial.print("Valor lido de /setTemperature: ");
         Serial.println(setTemp);
 
-        if (abs(lastTemperatureRead - setTemp) < 1) {
+       if ((int)lastTemperatureRead == (int)setTemp) {
           Serial.println("Temperatura igual! Piscando Led verde...");
-          for (int i=0; i<0; i++){
+          for (int i=0; i<10; i++){
             setColorRGB(LOW, HIGH, LOW); // Green
             vTaskDelay(pdMS_TO_TICKS(100));
             setColorRGB(LOW, LOW, LOW);  // OFF
